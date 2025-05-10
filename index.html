@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LearnIn</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <h1>LearnIn</h1>
+
+<div class="container">
+  <div class="section">
+    <h2>Ask Jarvis</h2>
+    <div class="input-group">
+      <input type="text" id="question" placeholder="Type or speak your question..." />
+      <div class="button-group">
+        <button onclick="askJarvis()">Ask</button>
+        <button id="mic-button" onclick="startVoiceInput()">Use Mic</button>
+      </div>
+    </div>
+    <p id="jarvis-response"></p>
+    <div id="voice-indicator" class="dot hidden"></div>
+  </div>
+
+  <div class="section">
+    <h2>Flashcards</h2>
+    <div class="input-group">
+      <input type="text" id="topic" placeholder="Enter a topic..." />
+      <div class="button-group">
+        <button onclick="generateFlashcards()">Generate</button>
+      </div>
+    </div>
+    <div id="flashcards" class="flashcards-container"></div>
+  </div>
+</div>
+
+  
+
+  <script>
+    function speak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      speechSynthesis.speak(utter);
+    }
+
+    async function askJarvis() {
+      const query = document.getElementById("question").value.toLowerCase().trim();
+    
+      if (query === "stop") {
+        speechSynthesis.cancel(); // Stop Jarvis from speaking
+        document.getElementById("jarvis-response").innerText = "Jarvis stopped.";
+        return;
+      }
+    
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+    
+      const data = await res.json();
+      document.getElementById("jarvis-response").innerText = data.answer;
+      speak(data.answer);
+    }
+    
+
+    async function generateFlashcards() {
+      const topic = document.getElementById("topic").value;
+      const res = await fetch("/flashcards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic }),
+      });
+      const cards = await res.json();
+      const container = document.getElementById("flashcards");
+      container.innerHTML = "";
+      cards.forEach(card => {
+        const cardDiv = document.createElement("div");
+        cardDiv.className = "card";
+        cardDiv.innerHTML = `
+          <div class="front">${card.question}</div>
+          <div class="back">${card.answer}</div>
+        `;
+        cardDiv.onclick = () => cardDiv.classList.toggle("flipped");
+        container.appendChild(cardDiv);
+      });
+    }
+    function startVoiceInput() {
+      const micButton = document.getElementById("mic-button");
+    
+      if (!("webkitSpeechRecognition" in window)) {
+        alert("Your browser does not support voice recognition.");
+        return;
+      }
+    
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-IN";
+      recognition.interimResults = false;
+      recognition.continuous = false;
+    
+      micButton.textContent = "🎙️ Listening...";
+      micButton.disabled = true;
+      micButton.classList.add("listening");
+    
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("question").value = transcript;
+        askJarvis();
+      };
+    
+      recognition.onerror = (event) => {
+        console.error("Voice recognition error", event);
+        resetMicButton();
+      };
+    
+      recognition.onend = () => {
+        resetMicButton();
+      };
+    
+      recognition.start();
+    
+      function resetMicButton() {
+        micButton.textContent = "Use Mic";
+        micButton.disabled = false;
+        micButton.classList.remove("listening");
+      }
+    }
+    
+    
+  </script>
+</body>
+</html>
